@@ -1,0 +1,60 @@
+export type Particle = {
+    id: string;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    /** Mass participates in Barnes–Hut aggregation (defaults to 1). */
+    mass: number;
+};
+export type SpringEdge = {
+    source: string;
+    target: string;
+    kind?: string;
+    strength: number;
+    restLength: number;
+};
+export type SemanticEdge = {
+    a: string;
+    b: string;
+    /** Cosine similarity in [-1,1]. */
+    sim: number;
+};
+export type FieldConfig = {
+    /** Barnes–Hut approximation parameter (0.4..1.2 typical). */
+    theta: number;
+    /** N-body repulsion strength (higher = more spread). */
+    repulsionStrength: number;
+    /** Softening term to avoid infinite forces at small distance. */
+    softening: number;
+    /** Velocity damping per step (0..1). */
+    damping: number;
+    /** Cap particle speed. */
+    maxSpeed: number;
+    /** Hard-core separation radius (world units). */
+    minSeparation: number;
+    /** Extra repulsion applied inside minSeparation. */
+    separationStrength: number;
+    /** Semantic force: attraction applies when sim >= this. */
+    semanticAttractAbove: number;
+    /** Semantic force: repulsion applies when sim <= this. */
+    semanticRepelBelow: number;
+    semanticAttractStrength: number;
+    semanticRepelStrength: number;
+    /** Base spring rest length for semantic attraction. */
+    semanticRestLength: number;
+    /**
+     * Target radius for a soft circular boundary.
+     * The field applies inward pressure near this radius to keep nodes off the edge.
+     */
+    targetRadius: number;
+    /** Thickness of the boundary pressure band (world units). */
+    boundaryThickness: number;
+    /** Inward pressure strength applied near the boundary (higher = more push). */
+    boundaryPressure: number;
+};
+export type Force = {
+    fx: number;
+    fy: number;
+};
+//# sourceMappingURL=types.d.ts.map
