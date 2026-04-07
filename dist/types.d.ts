@@ -23,8 +23,14 @@ export type SemanticEdge = {
 export type FieldConfig = {
     /** Barnes–Hut approximation parameter (0.4..1.2 typical). */
     theta: number;
-    /** N-body repulsion strength (higher = more spread). */
+    /** Weak long-range Barnes–Hut repulsion. Keep low; local repulsion should dominate. */
     repulsionStrength: number;
+    /** Radius for strong node-local repulsion. */
+    localRepulsionRadius: number;
+    /** Strength of the node-local repulsion field. */
+    localRepulsionStrength: number;
+    /** Falloff exponent for node-local repulsion (higher = faster falloff). */
+    localRepulsionPower: number;
     /** Softening term to avoid infinite forces at small distance. */
     softening: number;
     /** Velocity damping per step (0..1). */
@@ -41,6 +47,8 @@ export type FieldConfig = {
     semanticRepelBelow: number;
     semanticAttractStrength: number;
     semanticRepelStrength: number;
+    /** Only apply semantic repulsion inside this radius so dissimilar nodes do not globally explode apart. */
+    semanticRepelRadius: number;
     /** Base spring rest length for semantic attraction. */
     semanticRestLength: number;
     /**
@@ -52,6 +60,8 @@ export type FieldConfig = {
     boundaryThickness: number;
     /** Inward pressure strength applied near the boundary (higher = more push). */
     boundaryPressure: number;
+    /** Only the outermost fraction of nodes should feel boundary pressure. */
+    boundaryEdgeFraction: number;
 };
 export type Force = {
     fx: number;
