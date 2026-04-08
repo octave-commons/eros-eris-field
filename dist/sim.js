@@ -19,19 +19,22 @@ export function stepField(params) {
     const indexById = new Map();
     for (let i = 0; i < particles.length; i += 1)
         indexById.set(particles[i].id, i);
-    // --- global repulsion (Barnes–Hut)
-    const tree = new BarnesHutQuadTree(particles);
-    for (let i = 0; i < particles.length; i += 1) {
-        const f = tree.repulsionOn(i, {
-            theta: config.theta,
-            strength: config.repulsionStrength,
-            softening: config.softening,
-        });
-        addForce(forces, i, f.fx, f.fy);
+    // --- weak long-range repulsion (Barnes–Hut)
+    if (config.repulsionStrength > 0) {
+        const tree = new BarnesHutQuadTree(particles);
+        for (let i = 0; i < particles.length; i += 1) {
+            const f = tree.repulsionOn(i, {
+                theta: config.theta,
+                strength: config.repulsionStrength,
+                softening: config.softening,
+            });
+            addForce(forces, i, f.fx, f.fy);
+        }
     }
-    // --- hard-core separation (grid-based, O(n))
-    if (config.minSeparation > 0 && config.separationStrength > 0) {
-        const cellSize = Math.max(1e-6, config.minSeparation);
+    // --- strong node-local repulsion (grid-based, O(n))
+    const localRadius = Math.max(config.minSeparation, config.localRepulsionRadius);
+    if (localRadius > 0 && (config.localRepulsionStrength > 0 || config.separationStrength > 0)) {
+        const cellSize = Math.max(1e-6, localRadius);
         const grid = new Map();
         const keyFor = (x, y) => {
             const gx = Math.floor(x / cellSize);
@@ -61,11 +64,21 @@ export function stepField(params) {
                         const dx = a.x - b.x;
                         const dy = a.y - b.y;
                         const d = hypot(dx, dy);
-                        if (d <= 1e-6 || d >= config.minSeparation)
+                        if (d <= 1e-6 || d >= localRadius)
                             continue;
                         const ux = dx / d;
                         const uy = dy / d;
-                        const push = (config.separationStrength * (config.minSeparation - d)) / config.minSeparation;
+                        let push = 0;
+                        if (config.localRepulsionStrength > 0 && d < config.localRepulsionRadius) {
+                            const t = clamp(1 - d / Math.max(1e-6, config.localRepulsionRadius), 0, 1);
+                            push += config.localRepulsionStrength * Math.pow(t, config.localRepulsionPower);
+                        }
+                        if (config.minSeparation > 0 && config.separationStrength > 0 && d < config.minSeparation) {
+                            const t = clamp(1 - d / Math.max(1e-6, config.minSeparation), 0, 1);
+                            push += config.separationStrength * (1 + 24 * t * t * t);
+                        }
+                        if (push <= 0)
+                            continue;
                         addForce(forces, i, ux * push, uy * push);
                         addForce(forces, j, -ux * push, -uy * push);
                     }
@@ -89,7 +102,8 @@ export function stepField(params) {
         const ux = dx / d;
         const uy = dy / d;
         const delta = d - e.restLength;
-        const mag = -e.strength * delta;
+        // Hooke-style spring: stretched edges pull together, compressed edges push apart.
+        const mag = e.strength * delta;
         addForce(forces, si, ux * mag, uy * mag);
         addForce(forces, ti, -ux * mag, -uy * mag);
     }
@@ -109,38 +123,43 @@ export function stepField(params) {
         const ux = dx / d;
         const uy = dy / d;
         if (s.sim >= config.semanticAttractAbove) {
-            // Attraction as a spring with similarity-shortened rest length.
-            const t = clamp((1 - s.sim) / Math.max(1e-6, 1 - config.semanticAttractAbove), 0, 1);
-            const rest = config.semanticRestLength * (0.65 + t * 1.8);
+            // Strong attraction as similarity rises; highly similar nodes should dominate local structure.
+            const simT = clamp((s.sim - config.semanticAttractAbove) / Math.max(1e-6, 1 - config.semanticAttractAbove), 0, 1);
+            const rest = config.semanticRestLength * (0.28 + (1 - simT) * 1.35);
             const delta = d - rest;
-            const mag = -config.semanticAttractStrength * delta;
+            // Strong semantic neighbors should collapse inward when far apart and only push apart when over-compressed.
+            const mag = config.semanticAttractStrength * (1 + 4 * simT) * delta;
             addForce(forces, ai, ux * mag, uy * mag);
             addForce(forces, bi, -ux * mag, -uy * mag);
             continue;
         }
-        if (s.sim <= config.semanticRepelBelow) {
-            // Extra repulsion (beyond spatial repulsion) for very dissimilar nodes.
-            const t = clamp((config.semanticRepelBelow - s.sim) / Math.max(1e-6, config.semanticRepelBelow), 0, 1);
-            const mag = (config.semanticRepelStrength * (0.25 + t)) / (d + config.softening);
+        if (s.sim <= config.semanticRepelBelow && d < config.semanticRepelRadius) {
+            // Dissimilar nodes only repel when too close; they should not globally explode the field.
+            const simT = clamp((config.semanticRepelBelow - s.sim) / Math.max(1e-6, config.semanticRepelBelow + 1), 0, 1);
+            const distT = clamp(1 - d / Math.max(1e-6, config.semanticRepelRadius), 0, 1);
+            const mag = config.semanticRepelStrength * (0.5 + simT) * Math.pow(distT, 3);
             // Push apart.
             addForce(forces, ai, -ux * mag, -uy * mag);
             addForce(forces, bi, ux * mag, uy * mag);
         }
     }
-    // --- boundary pressure (soft circular wall)
+    // --- boundary pressure (soft circular wall on outermost edge nodes only)
     if (config.targetRadius > 0 && config.boundaryThickness > 0 && config.boundaryPressure > 0) {
         const outer = config.targetRadius;
         const thickness = Math.max(1e-6, config.boundaryThickness);
         const inner = Math.max(0, outer - thickness);
         const k = config.boundaryPressure;
+        const edgeCount = Math.max(1, Math.ceil(particles.length * clamp(config.boundaryEdgeFraction, 0.001, 1)));
+        const radii = particles.map((p) => hypot(p.x, p.y)).sort((a, b) => a - b);
+        const edgeCutoff = radii[Math.max(0, radii.length - edgeCount)] ?? inner;
         for (let i = 0; i < particles.length; i += 1) {
             const p = particles[i];
             const r = hypot(p.x, p.y);
-            if (r <= inner || r <= 1e-6)
+            if (r <= inner || r < edgeCutoff || r <= 1e-6)
                 continue;
             // t=0 at inner band edge; t=1 at outer radius.
             const t = clamp((r - inner) / thickness, 0, 4);
-            const mag = k * t * t;
+            const mag = k * t * t * t;
             const ux = p.x / r;
             const uy = p.y / r;
             addForce(forces, i, -ux * mag, -uy * mag);
@@ -175,19 +194,17 @@ export function stepField(params) {
         p.x -= meanX;
         p.y -= meanY;
     }
-    // Emergency hard clamp (rare): if something explodes, shrink back.
+    // Emergency hard clamp (rare): rein in only the offenders instead of crunching the whole graph.
     if (config.targetRadius > 0) {
-        let rMax = 0;
-        for (const p of particles)
-            rMax = Math.max(rMax, hypot(p.x, p.y));
-        const hard = config.targetRadius * 2;
-        if (rMax > hard && rMax > 0) {
-            const s = config.targetRadius / rMax;
-            for (const p of particles) {
+        const hard = config.targetRadius + Math.max(1, config.boundaryThickness * 0.35);
+        for (const p of particles) {
+            const r = hypot(p.x, p.y);
+            if (r > hard && r > 0) {
+                const s = hard / r;
                 p.x *= s;
                 p.y *= s;
-                p.vx *= s;
-                p.vy *= s;
+                p.vx *= 0.35;
+                p.vy *= 0.35;
             }
         }
     }
