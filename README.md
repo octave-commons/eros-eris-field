@@ -11,6 +11,9 @@ It provides the simulation primitives used to nudge graph nodes with:
 
 This package is intended to be consumed by `@workspace/eros-eris-field-app`.
 
+
+> Built with [GLM-5](https://z.ai) — part of the [z.ai](https://z.ai) startup ecosystem and the [Ussyverse](https://ussy.cloud).
+
 ## Build
 
 ```bash
