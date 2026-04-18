@@ -24,4 +24,11 @@ pnpm -C orgs/octave-commons/eros-eris-field build
 
 - `BarnesHutQuadTree`
 - `stepField`
+- `buildSemanticEdgesForCandidate`
 - layout field types (`Particle`, `SpringEdge`, `SemanticEdge`, `FieldConfig`)
+
+## Vexx integration
+
+`buildSemanticEdgesForCandidate` can offload cosine matrix scoring to `vexx`
+when given a `vexx` config. If `vexx` is unavailable, it falls back to local
+cosine scoring.

@@ -1,25 +1,25 @@
-const MIN_HALF = 1e-3;
-class QuadNode {
-    cx;
-    cy;
-    half;
-    mass = 0;
-    comX = 0;
-    comY = 0;
-    /** Leaf: index of one particle (if not subdivided). */
-    body = null;
-    /** Internal node children (NW, NE, SW, SE). */
-    children = null;
-    constructor(cx, cy, half) {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BarnesHutQuadTree = void 0;
+var MIN_HALF = 1e-3;
+var QuadNode = /** @class */ (function () {
+    function QuadNode(cx, cy, half) {
         this.cx = cx;
         this.cy = cy;
         this.half = half;
+        this.mass = 0;
+        this.comX = 0;
+        this.comY = 0;
+        /** Leaf: index of one particle (if not subdivided). */
+        this.body = null;
+        /** Internal node children (NW, NE, SW, SE). */
+        this.children = null;
     }
-    insert(particles, index) {
-        const p = particles[index];
+    QuadNode.prototype.insert = function (particles, index) {
+        var p = particles[index];
         // Update mass + COM incrementally.
-        const m0 = this.mass;
-        const m1 = m0 + p.mass;
+        var m0 = this.mass;
+        var m1 = m0 + p.mass;
         if (m1 > 0) {
             this.comX = (this.comX * m0 + p.x * p.mass) / m1;
             this.comY = (this.comY * m0 + p.y * p.mass) / m1;
@@ -39,30 +39,30 @@ class QuadNode {
             this.body = null;
             return;
         }
-        const existing = this.body;
+        var existing = this.body;
         this.body = null;
         this.subdivide();
         // Reinsert existing + new.
         if (existing !== null) {
-            const ep = particles[existing];
+            var ep = particles[existing];
             this.childFor(ep.x, ep.y).insert(particles, existing);
         }
         this.childFor(p.x, p.y).insert(particles, index);
-    }
-    subdivide() {
-        const q = this.half / 2;
+    };
+    QuadNode.prototype.subdivide = function () {
+        var q = this.half / 2;
         this.children = [
             new QuadNode(this.cx - q, this.cy + q, q), // NW
             new QuadNode(this.cx + q, this.cy + q, q), // NE
             new QuadNode(this.cx - q, this.cy - q, q), // SW
             new QuadNode(this.cx + q, this.cy - q, q), // SE
         ];
-    }
-    childFor(x, y) {
+    };
+    QuadNode.prototype.childFor = function (x, y) {
         if (!this.children)
             throw new Error("no children");
-        const east = x >= this.cx;
-        const north = y >= this.cy;
+        var east = x >= this.cx;
+        var north = y >= this.cy;
         if (!east && north)
             return this.children[0];
         if (east && north)
@@ -70,46 +70,48 @@ class QuadNode {
         if (!east && !north)
             return this.children[2];
         return this.children[3];
-    }
-}
-export class BarnesHutQuadTree {
-    particles;
-    root;
-    constructor(particles) {
+    };
+    return QuadNode;
+}());
+var BarnesHutQuadTree = /** @class */ (function () {
+    function BarnesHutQuadTree(particles) {
         this.particles = particles;
-        const { cx, cy, half } = computeBounds(particles);
+        var _a = computeBounds(particles), cx = _a.cx, cy = _a.cy, half = _a.half;
         this.root = new QuadNode(cx, cy, half);
-        for (let i = 0; i < particles.length; i += 1) {
+        for (var i = 0; i < particles.length; i += 1) {
             this.root.insert(particles, i);
         }
     }
-    repulsionOn(index, opts) {
-        const p = this.particles[index];
-        const out = { fx: 0, fy: 0 };
+    BarnesHutQuadTree.prototype.repulsionOn = function (index, opts) {
+        var p = this.particles[index];
+        var out = { fx: 0, fy: 0 };
         accumulateRepulsion(this.root, this.particles, index, p.x, p.y, opts, out);
         return out;
-    }
-}
+    };
+    return BarnesHutQuadTree;
+}());
+exports.BarnesHutQuadTree = BarnesHutQuadTree;
 function computeBounds(particles) {
     if (particles.length === 0)
         return { cx: 0, cy: 0, half: 1 };
-    let minX = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-    for (const p of particles) {
+    var minX = Number.POSITIVE_INFINITY;
+    var maxX = Number.NEGATIVE_INFINITY;
+    var minY = Number.POSITIVE_INFINITY;
+    var maxY = Number.NEGATIVE_INFINITY;
+    for (var _i = 0, particles_1 = particles; _i < particles_1.length; _i++) {
+        var p = particles_1[_i];
         minX = Math.min(minX, p.x);
         maxX = Math.max(maxX, p.x);
         minY = Math.min(minY, p.y);
         maxY = Math.max(maxY, p.y);
     }
-    const w = Math.max(1e-6, maxX - minX);
-    const h = Math.max(1e-6, maxY - minY);
-    const side = Math.max(w, h);
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const half = side / 2 + 1e-3;
-    return { cx, cy, half };
+    var w = Math.max(1e-6, maxX - minX);
+    var h = Math.max(1e-6, maxY - minY);
+    var side = Math.max(w, h);
+    var cx = (minX + maxX) / 2;
+    var cy = (minY + maxY) / 2;
+    var half = side / 2 + 1e-3;
+    return { cx: cx, cy: cy, half: half };
 }
 function accumulateRepulsion(node, particles, selfIndex, x, y, opts, out) {
     if (node.mass <= 0)
@@ -117,25 +119,26 @@ function accumulateRepulsion(node, particles, selfIndex, x, y, opts, out) {
     // Leaf with the same particle.
     if (!node.children && node.body === selfIndex)
         return;
-    const dx = x - node.comX;
-    const dy = y - node.comY;
-    const dist2 = dx * dx + dy * dy + opts.softening;
-    const dist = Math.sqrt(dist2);
-    const size = node.half * 2;
+    var dx = x - node.comX;
+    var dy = y - node.comY;
+    var dist2 = dx * dx + dy * dy + opts.softening;
+    var dist = Math.sqrt(dist2);
+    var size = node.half * 2;
     // Barnes–Hut criterion: far enough → approximate as one body.
     if (!node.children || size / dist < opts.theta) {
-        const inv = 1 / dist;
-        const inv3 = inv * inv * inv;
-        const mag = opts.strength * node.mass * inv3;
+        var inv = 1 / dist;
+        var inv3 = inv * inv * inv;
+        var mag = opts.strength * node.mass * inv3;
         out.fx += dx * mag;
         out.fy += dy * mag;
         return;
     }
     // Recurse.
-    const ch = node.children;
+    var ch = node.children;
     if (!ch)
         return;
-    for (const child of ch) {
+    for (var _i = 0, ch_1 = ch; _i < ch_1.length; _i++) {
+        var child = ch_1[_i];
         // Quick prune: child with no mass.
         if (child.mass <= 0)
             continue;
