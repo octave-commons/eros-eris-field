@@ -14,6 +14,17 @@ function addForce(forces: Force[], i: number, fx: number, fy: number): void {
   forces[i]!.fy += fy;
 }
 
+function withFieldConfigDefaults(config: FieldConfig): FieldConfig {
+  return {
+    ...config,
+    localRepulsionRadius: config.localRepulsionRadius ?? 0,
+    localRepulsionStrength: config.localRepulsionStrength ?? 0,
+    localRepulsionPower: config.localRepulsionPower ?? 1,
+    semanticRepelRadius: config.semanticRepelRadius ?? Infinity,
+    boundaryEdgeFraction: config.boundaryEdgeFraction ?? 1,
+  };
+}
+
 export function stepField(params: {
   particles: Particle[];
   dt: number;
@@ -21,7 +32,8 @@ export function stepField(params: {
   springs?: SpringEdge[];
   semantic?: SemanticEdge[];
 }): void {
-  const { particles, dt, config, springs = [], semantic = [] } = params;
+  const { particles, dt, config: rawConfig, springs = [], semantic = [] } = params;
+  const config = withFieldConfigDefaults(rawConfig);
   if (particles.length === 0) return;
 
   // Keep integration stable even if callers pass a large wall-clock dt.
