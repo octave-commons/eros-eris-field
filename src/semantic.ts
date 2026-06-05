@@ -256,8 +256,8 @@ async function vexxSimilarityMatrix(candidates: SemanticEmbeddingNode[], peers: 
   const minCandidates = Math.max(1, Math.floor(vexx.minCandidates ?? 1));
   if (candidates.length === 0 || peers.length < minCandidates) return null;
 
-  const maxCandidatesPerCall = Math.floor(vexx.maxCandidatesPerCall ?? 256);
-  const optimalBatchSize = Math.floor(vexx.optimalBatchSize ?? 128);
+  const maxCandidatesPerCall = Math.max(1, Math.floor(vexx.maxCandidatesPerCall ?? 256));
+  const optimalBatchSize = Math.max(1, Math.floor(vexx.optimalBatchSize ?? 128));
 
   // For small matrices, use single call
   if (candidates.length <= maxCandidatesPerCall && peers.length <= optimalBatchSize * 2) {
