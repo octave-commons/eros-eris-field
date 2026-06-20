@@ -9,6 +9,17 @@ function hypot(x: number, y: number): number {
   return Math.sqrt(x * x + y * y);
 }
 
+function withFieldConfigDefaults(config: FieldConfig): FieldConfig {
+  return {
+    ...config,
+    localRepulsionRadius: config.localRepulsionRadius ?? 0,
+    localRepulsionStrength: config.localRepulsionStrength ?? 0,
+    localRepulsionPower: config.localRepulsionPower ?? 1,
+    semanticRepelRadius: config.semanticRepelRadius ?? Infinity,
+    boundaryEdgeFraction: config.boundaryEdgeFraction ?? 1,
+  };
+}
+
 function addForce(forces: Force[], i: number, fx: number, fy: number): void {
   forces[i]!.fx += fx;
   forces[i]!.fy += fy;
@@ -21,10 +32,10 @@ export function stepField(params: {
   springs?: SpringEdge[];
   semantic?: SemanticEdge[];
 }): void {
-  const { particles, dt, config, springs = [], semantic = [] } = params;
+  const { particles, dt, config: rawConfig, springs = [], semantic = [] } = params;
   if (particles.length === 0) return;
 
-  // Keep integration stable even if callers pass a large wall-clock dt.
+  const config = withFieldConfigDefaults(rawConfig);
   const stepDt = clamp(dt, 0.001, 0.5);
 
   const forces: Force[] = particles.map(() => ({ fx: 0, fy: 0 }));
