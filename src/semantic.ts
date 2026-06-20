@@ -51,6 +51,10 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function normalizePositiveInt(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
 function cosine(left: readonly number[], right: readonly number[]): number {
   const n = Math.min(left.length, right.length);
   if (n === 0) return 0;
@@ -256,8 +260,8 @@ async function vexxSimilarityMatrix(candidates: SemanticEmbeddingNode[], peers: 
   const minCandidates = Math.max(1, Math.floor(vexx.minCandidates ?? 1));
   if (candidates.length === 0 || peers.length < minCandidates) return null;
 
-  const maxCandidatesPerCall = Math.floor(vexx.maxCandidatesPerCall ?? 256);
-  const optimalBatchSize = Math.floor(vexx.optimalBatchSize ?? 128);
+  const maxCandidatesPerCall = normalizePositiveInt(vexx.maxCandidatesPerCall, 256);
+  const optimalBatchSize = normalizePositiveInt(vexx.optimalBatchSize, 128);
 
   // For small matrices, use single call
   if (candidates.length <= maxCandidatesPerCall && peers.length <= optimalBatchSize * 2) {
